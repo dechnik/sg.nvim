@@ -57,6 +57,47 @@ end
 -- Probably will break on me unexpectedly. Nice
 utils.system = vim.system or (require "sg.vendored.vim-system")
 
+utils.open = function(...)
+  local open = vim.ui.open
+    or function(path)
+      vim.validate {
+        path = { path, "string" },
+      }
+      local is_uri = path:match "%w+:"
+      if not is_uri then
+        path = vim.fn.expand(path)
+      end
+
+      local cmd
+
+      if vim.fn.has "mac" == 1 then
+        cmd = { "open", path }
+      elseif vim.fn.has "win32" == 1 then
+        if vim.fn.executable "rundll32" == 1 then
+          cmd = { "rundll32", "url.dll,FileProtocolHandler", path }
+        else
+          return nil, "vim.ui.open: rundll32 not found"
+        end
+      elseif vim.fn.executable "wslview" == 1 then
+        cmd = { "wslview", path }
+      elseif vim.fn.executable "xdg-open" == 1 then
+        cmd = { "xdg-open", path }
+      else
+        return nil, "vim.ui.open: no handler found (tried: wslview, xdg-open)"
+      end
+
+      local rv = utils.system(cmd, { text = true, detach = true }):wait()
+      if rv.code ~= 0 then
+        local msg = ("vim.ui.open: command failed (%d): %s"):format(rv.code, vim.inspect(cmd))
+        return rv, msg
+      end
+
+      return rv, nil
+    end
+
+  open(...)
+end
+
 -- From https://gist.github.com/jrus/3197011
 utils.uuid = function()
   local template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
@@ -89,22 +130,49 @@ utils.valid_node_executable = function(executable)
     return false, string.format("invalid executable: %s", executable)
   end
 
-  local output = vim.fn.systemlist(executable .. " --version")[1]
-  local ok, version = pcall(vim.version.parse, output)
-  if not ok then
-    return false, string.format("invalid node version: %s", output)
+  local output = vim.fn.systemlist(executable .. " --version") or {}
+  -- systemlist() leaves CR behind on Windows, fixing inconsistency
+  for i = #output, 1, -1 do
+    output[i] = output[i]:gsub("\r$", "")
+  end
+  return utils._validate_node_output(output)
+end
+
+utils._validate_node_output = function(output)
+  for _, line in ipairs(output) do
+    local ok, version = pcall(vim.version.parse, line, { strict = true })
+    if not ok then
+      return false, string.format("invalid node version: %s", output)
+    end
+
+    -- Sometimes there is other garbage in the lines, so let's keep reading
+    -- until we find something that looks like a version.
+    --
+    -- Only then will we check if it's valid
+    if version then
+      local min_node_version = assert(vim.version.parse "v18")
+      if not vim.version.gt(version, min_node_version) then
+        return false, string.format("node version must be >= %s. Got: %s", min_node_version, version)
+      end
+
+      return true, version
+    end
   end
 
-  if not version then
-    return false, string.format("unable to parse node version output: %s", output)
-  end
+  return false, string.format("unable to determine node version: %s", vim.inspect(output))
+end
 
-  local min_node_version = assert(vim.version.parse "v18")
-  if not vim.version.gt(version, min_node_version) then
-    return false, string.format("node version must be >= %s. Got: %s", min_node_version, version)
-  end
+utils.blocking = function(req, timeout)
+  local results
+  req(function(...)
+    results = { ... }
+  end)
 
-  return true, version
+  vim.wait(timeout or 10000, function()
+    return results
+  end, 10)
+
+  return unpack(results or {})
 end
 
 return utils

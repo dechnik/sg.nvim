@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.2.7"
+version = "1.0.5"
 edition = "2021"
 
 [package]
@@ -30,17 +30,20 @@ sg-gql = { path  = "crates/sg-gql" }
 sg-types = { path  = "crates/sg-types" }
 jsonrpc = { path = "crates/jsonrpc" }
 gix = "0.52.0"
+tiny_http = "0.12.0"
+keyring = "2.1.0"
+whoami = "1.4.1"
 
 [workspace.dependencies]
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
+openssl = { version = "0.10", features = ["vendored"] }
 
 serde = "1.0.180"
 serde_json = "1.0"
 
 graphql_client = { version = "0.13.0", features = ["reqwest", "reqwest-blocking"] }
 reqwest = { version = "0.11", features = ["native-tls-vendored"] }
-openssl = { version = "0.10", features = ["vendored"] }
 
 lsp-types = "0.94.0"
 url = "2.4.0"
@@ -48,21 +51,16 @@ url = "2.4.0"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.3.1"
+cargo-dist-version = "0.5.0"
 # CI backends to support
 ci = ["github"]
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "x86_64-unknown-linux-gnu",
-    "aarch64-unknown-linux-gnu",
-    "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-]
+targets = ["aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msvc"]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
+# Skip checking whether the specified configuration files are up to date
 allow-dirty = ["ci"]
 
 # The profile that 'cargo dist' will build with
